@@ -38,6 +38,7 @@ import io.github.dsheirer.preference.radioreference.RadioReferencePreference;
 import io.github.dsheirer.preference.record.RecordPreference;
 import io.github.dsheirer.preference.source.TunerPreference;
 import io.github.dsheirer.preference.swing.SwingPreference;
+import io.github.dsheirer.preference.thinline.ThinlineRadioPreference;
 import io.github.dsheirer.sample.Listener;
 
 /**
@@ -68,6 +69,7 @@ public class UserPreferences implements Listener<PreferenceType>
     private NowPlayingPreference mNowPlayingPreference;
     private RadioReferencePreference mRadioReferencePreference;
     private RecordPreference mRecordPreference;
+    private ThinlineRadioPreference mThinlineRadioPreference;
     private TunerPreference mTunerPreference;
     private VectorCalibrationPreference mVectorCalibrationPreference;
     private P25BandplanOverrideRegistry mP25BandplanOverrideRegistry;
@@ -161,6 +163,14 @@ public class UserPreferences implements Listener<PreferenceType>
     }
 
     /**
+     * Thinline Radio site-control preferences used by Core streaming and SDR Health.
+     */
+    public ThinlineRadioPreference getThinlineRadioPreference()
+    {
+        return mThinlineRadioPreference;
+    }
+
+    /**
      * MP3 preferences
      */
     public MP3Preference getMP3Preference()
@@ -241,6 +251,7 @@ public class UserPreferences implements Listener<PreferenceType>
         mNowPlayingPreference = new NowPlayingPreference(this::receive);
         mRadioReferencePreference = new RadioReferencePreference(this::receive);
         mRecordPreference = new RecordPreference(this::receive);
+        mThinlineRadioPreference = new ThinlineRadioPreference(this::receive);
         mTunerPreference = new TunerPreference(this::receive);
         mVectorCalibrationPreference = new VectorCalibrationPreference(this::receive);
     }

@@ -34,6 +34,7 @@ public enum PreferenceType
     NOW_PLAYING,
     RADIO_REFERENCE,
     RECORD,
+    THINLINE_RADIO,
     TUNER,
     VOICE_DECRYPTION_MODULE;
 }

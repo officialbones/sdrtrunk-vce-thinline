@@ -13,6 +13,8 @@ import io.github.dsheirer.audio.broadcast.openmhz.OpenMHzConfiguration;
 import io.github.dsheirer.audio.broadcast.radioresolve.RadioResolveConfiguration;
 import io.github.dsheirer.audio.broadcast.rdioscanner.RdioScannerConfiguration;
 import io.github.dsheirer.audio.broadcast.shoutcast.v1.ShoutcastV1Configuration;
+import io.github.dsheirer.audio.broadcast.thinline.ThinlineRadioConfiguration;
+import io.github.dsheirer.audio.broadcast.thinline.ThinlineRadioCoreConfiguration;
 import java.net.URI;
 import java.util.*;
 
@@ -44,6 +46,8 @@ public final class StreamingConfigurationCodec
             case ICECAST_TCP -> new IcecastTCPConfiguration();
             case SHOUTCAST_V1 -> new ShoutcastV1Configuration();
             case RDIOSCANNER_CALL -> new RdioScannerConfiguration();
+            case THINLINE_RADIO -> new ThinlineRadioConfiguration();
+            case THINLINE_RADIO_CORE -> new ThinlineRadioCoreConfiguration();
             case OPENMHZ -> new OpenMHzConfiguration();
             case RADIORESOLVE -> new RadioResolveConfiguration();
             default -> throw invalid("Choose a supported streaming provider");
@@ -118,6 +122,7 @@ public final class StreamingConfigurationCodec
             for(Binding binding: allowed.values())
             {
                 if(binding.field().type().equals("password") &&
+                    !(candidate instanceof ThinlineRadioCoreConfiguration) &&
                     (!(read(candidate, binding) instanceof String text) || text.isBlank()))
                     throw invalid(binding.field().label() + " is required before enabling this destination");
             }
@@ -199,7 +204,8 @@ public final class StreamingConfigurationCodec
             fields.add(secret("password", "Password", "Password"));
             fields.add(number("delay", "Delivery delay (milliseconds)", "Delay", 0, 604800000L, long.class, true));
         }
-        else fields.add(secret("api_key", "API key", "ApiKey"));
+        else if(!(configuration instanceof ThinlineRadioCoreConfiguration))
+            fields.add(secret("api_key", "API key", "ApiKey"));
         if(configuration instanceof BroadcastifyCallConfiguration)
         {
             fields.add(number("system_id", "System ID", "SystemID", 0, Integer.MAX_VALUE, int.class, false));

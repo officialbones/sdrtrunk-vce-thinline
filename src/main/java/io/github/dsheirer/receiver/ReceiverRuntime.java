@@ -6,6 +6,7 @@ package io.github.dsheirer.receiver;
 import io.github.dsheirer.alias.AliasModel;
 import io.github.dsheirer.audio.broadcast.AudioStreamingManager;
 import io.github.dsheirer.audio.broadcast.BroadcastFormat;
+import io.github.dsheirer.audio.broadcast.thinline.ThinlineRadioHealthReporter;
 import io.github.dsheirer.audio.call.AudioCallCoordinator;
 import io.github.dsheirer.audio.call.diagnostic.LogicalCallDiagnosticService;
 import io.github.dsheirer.audio.codec.mbe.JmbeLibraryLoader;
@@ -88,6 +89,7 @@ public final class ReceiverRuntime implements AutoCloseable
     private ScheduledFuture<?> mRecordingRetention;
     private AudioRecordingManager mRecording;
     private AudioStreamingManager mStreaming;
+    private ThinlineRadioHealthReporter mThinlineHealth;
     private DecodeEventViewService mDecodeEvents;
     private RemoteConnectivityService mRemote;
     private ReceiverWebServices mWebServices;
@@ -252,6 +254,7 @@ public final class ReceiverRuntime implements AutoCloseable
                 mPreferences.getRecordPreference(), () -> mRecording.getQueueStatus().queuedSourceBytes() > 0);
         mStreaming = new AudioStreamingManager(mConfiguration.getBroadcastModel(), BroadcastFormat.MP3,
             mPreferences, mActivity::receiveStreamedCall);
+        mThinlineHealth = new ThinlineRadioHealthReporter(mPreferences, mConfiguration.getBroadcastModel());
         ChannelProcessingManager processing = mConfiguration.getChannelProcessingManager();
         mDecodeEvents = new DecodeEventViewService(processing, aliases);
         processing.addBoundDecodeEventListener(mDecodeEvents.getBoundDecodeEventListener());
@@ -265,6 +268,8 @@ public final class ReceiverRuntime implements AutoCloseable
             mActivity::receiveResolvedCall, mCallDiagnostics,
             mPreferences.getCallManagementPreference()::getCallFilteringSettings,
             mWebServices::receiveCompletedCallForAlerts);
+        mCalls.setCoreCallStartListener(mConfiguration.getBroadcastModel()::notifyCoreCallStarted);
+        mCalls.setCoreCallDropListener(mConfiguration.getBroadcastModel()::notifyCoreCallDropped);
         mWebServices.setLogicalCallDiagnostics(mCallDiagnostics, mCalls);
         mWebServices.setReceiverHealthOutputSources(mCalls, mRecording, mStreaming, mConfiguration.getBroadcastModel());
         processing.addAudioCallListener(mCalls);
@@ -288,6 +293,7 @@ public final class ReceiverRuntime implements AutoCloseable
         if(mTranscription != null) mTranscription.start();
         startRecordingRetention();
         mStreaming.start();
+        if(mThinlineHealth != null) mThinlineHealth.start();
         mConfiguration.init();
         if(mRemote != null) mRemote.start();
     }
@@ -402,6 +408,7 @@ public final class ReceiverRuntime implements AutoCloseable
             safe &= shutdownStep("decode-event views", mDecodeEvents::close);
         }
         safe &= shutdownStep("event-log writes", EventLogger::flushPendingWrites);
+        if(mThinlineHealth != null) safe &= shutdownStep("thinline health", mThinlineHealth::stop);
         if(mStreaming != null) safe &= shutdownStep("audio streaming", mStreaming::stop);
         if(mConfiguration != null) safe &= shutdownStep("stream destinations", mConfiguration.getBroadcastModel()::close);
         if(mRecordingRetention != null) { mRecordingRetention.cancel(false); mRecordingRetention = null; }

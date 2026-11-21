@@ -101,23 +101,37 @@ class StreamingAdministrationServiceTest
 
     @Test void everyProviderRetainsIdentityAndSecretsWithoutReturningThem() throws Exception
     {
-        assertEquals(9, StreamingConfigurationCodec.providers().size());
+        assertEquals(11, StreamingConfigurationCodec.providers().size());
         for(var provider: StreamingConfigurationCodec.providers())
         {
             var original=StreamingConfigurationCodec.template(provider.id());
             Map<String,Object> changes=new HashMap<>();
             changes.put("name","Test " + provider.id());
-            String secret=provider.fields().stream().filter(field -> field.type().equals("password")).findFirst().orElseThrow().key();
-            changes.put(secret,"test-secret-not-for-browser");
+            var secretField=provider.fields().stream().filter(field -> field.type().equals("password")).findFirst();
+            secretField.ifPresent(field -> changes.put(field.key(),"test-secret-not-for-browser"));
+            if(provider.id().equals("THINLINE_RADIO_CORE") || provider.id().equals("THINLINE_RADIO") ||
+                provider.id().equals("RDIOSCANNER_CALL"))
+            {
+                changes.put("system_id", 1);
+            }
             boolean configurableAge=provider.fields().stream().anyMatch(field -> field.key().equals("maximum_recording_age"));
             if(configurableAge) changes.put("maximum_recording_age",123456L);
             var saved=StreamingConfigurationCodec.apply(original,changes);
             var renamed=StreamingConfigurationCodec.apply(saved,Map.of("name","Renamed"));
             assertEquals(original.getConfigurationId(),renamed.getConfigurationId());
             assertEquals(configurableAge ? 123456L : original.getMaximumRecordingAge(),renamed.getMaximumRecordingAge());
-            assertEquals(Set.of(secret),StreamingConfigurationCodec.view(renamed).configuredCredentials());
-            assertFalse(StreamingConfigurationCodec.view(renamed).settings().containsKey(secret));
-            assertFalse(StreamingConfigurationCodec.view(renamed).toString().contains("test-secret-not-for-browser"));
+            if(secretField.isPresent())
+            {
+                String secret=secretField.get().key();
+                assertEquals(Set.of(secret),StreamingConfigurationCodec.view(renamed).configuredCredentials());
+                assertFalse(StreamingConfigurationCodec.view(renamed).settings().containsKey(secret));
+                assertFalse(StreamingConfigurationCodec.view(renamed).toString().contains("test-secret-not-for-browser"));
+            }
+            else
+            {
+                assertTrue(StreamingConfigurationCodec.view(renamed).configuredCredentials().isEmpty(),
+                    "Thinline Radio Core uses the site-control key from preferences");
+            }
             assertThrows(IllegalArgumentException.class,() -> StreamingConfigurationCodec.apply(saved,Map.of("configuration_id","other")));
             assertThrows(IllegalArgumentException.class,() -> StreamingConfigurationCodec.apply(saved,Map.of("maximum_recording_age",1.5)));
         }
@@ -321,15 +335,30 @@ class StreamingAdministrationServiceTest
             for(var provider: StreamingConfigurationCodec.providers())
             {
                 assertTrue(service.template(provider.id()).configuredCredentials().isEmpty());
-                String secret=provider.fields().stream().filter(field -> field.type().equals("password")).findFirst().orElseThrow().key();
-                var saved=service.save(null,provider.id(),Map.of("name",provider.label(),secret,"fixture-only-secret"),null);
+                Map<String,Object> settings=new HashMap<>();
+                settings.put("name",provider.label());
+                var secretField=provider.fields().stream().filter(field -> field.type().equals("password")).findFirst();
+                secretField.ifPresent(field -> settings.put(field.key(),"fixture-only-secret"));
+                if(provider.id().equals("THINLINE_RADIO_CORE") || provider.id().equals("THINLINE_RADIO") ||
+                    provider.id().equals("RDIOSCANNER_CALL"))
+                {
+                    settings.put("system_id", 1);
+                }
+                var saved=service.save(null,provider.id(),settings,null);
                 var stored=new ConfigurationDatabaseStore(database).load().broadcastConfigurations().stream()
                     .filter(item -> item.getConfigurationId().equals(saved.configurationId())).findFirst().orElseThrow();
                 assertEquals(provider.id(),stored.getBroadcastServerType().name());
-                assertEquals(Set.of(secret),StreamingConfigurationCodec.view(stored).configuredCredentials());
-                assertFalse(service.get(saved.configurationId()).toString().contains("fixture-only-secret"));
+                if(secretField.isPresent())
+                {
+                    assertEquals(Set.of(secretField.get().key()),StreamingConfigurationCodec.view(stored).configuredCredentials());
+                    assertFalse(service.get(saved.configurationId()).toString().contains("fixture-only-secret"));
+                }
+                else
+                {
+                    assertTrue(StreamingConfigurationCodec.view(stored).configuredCredentials().isEmpty());
+                }
             }
-            assertEquals(9,new ConfigurationDatabaseStore(database).load().broadcastConfigurations().size());
+            assertEquals(11,new ConfigurationDatabaseStore(database).load().broadcastConfigurations().size());
             var site=service.catalog().destinations().stream().filter(item -> item.provider().equals("BROADCASTIFY_CALL_SITE")).findFirst().orElseThrow();
             assertThrows(IllegalArgumentException.class,() -> service.save(site.configurationId(),site.provider(),
                 Map.of("enabled",true,"system_id",42,"alias_list_id",999L,"channel_configuration_id",UUID.randomUUID().toString()),service.get(site.configurationId()).editRevision()));

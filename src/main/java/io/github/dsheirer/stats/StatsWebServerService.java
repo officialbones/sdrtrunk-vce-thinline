@@ -63,6 +63,7 @@ import io.github.dsheirer.web.http.CallFilteringSettingsHttpController;
 import io.github.dsheirer.web.http.TunerAllocationHttpController;
 import io.github.dsheirer.web.http.MapSnapshotHttpController;
 import io.github.dsheirer.web.http.OperationalPreferencesHttpController;
+import io.github.dsheirer.web.http.ThinlinePreferencesHttpController;
 import io.github.dsheirer.web.http.EncryptionKeysHttpController;
 import io.github.dsheirer.web.http.ApiHttpResponse;
 import io.github.dsheirer.web.http.ApiRequestDecoder;
@@ -674,6 +675,13 @@ public class StatsWebServerService implements AutoCloseable
             new OperationalPreferencesHttpController(new OperationalPreferencesService(mUserPreferences));
         server.createContext(OperationalPreferencesHttpController.PATH, mWebRequestSecurity.protectApi(
             WebCapability.ADMIN_SETTINGS, operationalPreferencesController::handle));
+
+        ThinlinePreferencesHttpController thinlinePreferencesController =
+            new ThinlinePreferencesHttpController(mUserPreferences);
+        server.createContext(ThinlinePreferencesHttpController.PATH, mWebRequestSecurity.protectApi(
+            WebCapability.ADMIN_SETTINGS, thinlinePreferencesController.settingsHandler()));
+        server.createContext(ThinlinePreferencesHttpController.TEST_PATH, mWebRequestSecurity.protectApi(
+            WebCapability.ADMIN_SETTINGS, thinlinePreferencesController.testHandler()));
 
         EncryptionKeysHttpController encryptionKeysController = new EncryptionKeysHttpController(
             mUserPreferences.getEncryptionKeyPreference(),

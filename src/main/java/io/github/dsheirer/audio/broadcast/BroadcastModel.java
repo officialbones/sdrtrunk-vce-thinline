@@ -21,6 +21,8 @@ package io.github.dsheirer.audio.broadcast;
 import io.github.dsheirer.alias.AliasModel;
 import io.github.dsheirer.alias.id.broadcast.BroadcastChannel;
 import io.github.dsheirer.audio.broadcast.radioresolve.RadioResolveBroadcaster;
+import io.github.dsheirer.audio.call.AudioCallSnapshot;
+import io.github.dsheirer.audio.call.CallLegId;
 import io.github.dsheirer.metadata.site.SiteMetadataEvent;
 import io.github.dsheirer.metadata.site.SiteMetadataListener;
 import io.github.dsheirer.preference.UserPreferences;
@@ -32,6 +34,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
@@ -332,6 +335,46 @@ public class BroadcastModel implements Listener<AudioRecording>, SiteMetadataLis
         }
 
         return null;
+    }
+
+    /**
+     * Notifies ThinLine Core destinations that a live call with streaming destinations has started.
+     */
+    public void notifyCoreCallStarted(AudioCallSnapshot snapshot)
+    {
+        if(mClosed || snapshot == null || !snapshot.hasBroadcastChannels())
+        {
+            return;
+        }
+
+        CallLegId callLegId = snapshot.callLegId();
+        Collection<BroadcastChannel> destinations = snapshot.broadcastChannels();
+        for(AbstractAudioBroadcaster<?> broadcaster : mBroadcasterMap.values())
+        {
+            if(broadcaster instanceof CoreCallListener listener)
+            {
+                listener.callStarted(callLegId, snapshot, destinations);
+            }
+        }
+    }
+
+    /**
+     * Notifies ThinLine Core destinations that a live call was dropped before a recording was produced.
+     */
+    public void notifyCoreCallDropped(CallLegId callLegId)
+    {
+        if(mClosed || callLegId == null)
+        {
+            return;
+        }
+
+        for(AbstractAudioBroadcaster<?> broadcaster : mBroadcasterMap.values())
+        {
+            if(broadcaster instanceof CoreCallListener listener)
+            {
+                listener.callDropped(callLegId);
+            }
+        }
     }
 
     @Override

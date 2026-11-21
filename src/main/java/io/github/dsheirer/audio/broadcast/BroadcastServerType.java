@@ -37,6 +37,8 @@ public enum BroadcastServerType
 
     ICECAST_HTTP("Icecast 2 (v2.4+)"),
     RDIOSCANNER_CALL("Rdio Scanner"),
+    THINLINE_RADIO("Thinline Radio"),
+    THINLINE_RADIO_CORE("Thinline Radio Core"),
     OPENMHZ("OpenMHz"),
     RADIORESOLVE("RadioResolve"),
     ICECAST_TCP("Icecast (v2.3)"),

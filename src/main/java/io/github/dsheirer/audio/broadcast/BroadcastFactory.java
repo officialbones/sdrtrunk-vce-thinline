@@ -27,6 +27,9 @@ import io.github.dsheirer.audio.broadcast.radioresolve.RadioResolveBroadcaster;
 import io.github.dsheirer.audio.broadcast.radioresolve.RadioResolveConfiguration;
 import io.github.dsheirer.audio.broadcast.rdioscanner.RdioScannerBroadcaster;
 import io.github.dsheirer.audio.broadcast.rdioscanner.RdioScannerConfiguration;
+import io.github.dsheirer.audio.broadcast.thinline.ThinlineRadioConfiguration;
+import io.github.dsheirer.audio.broadcast.thinline.ThinlineRadioCoreBroadcaster;
+import io.github.dsheirer.audio.broadcast.thinline.ThinlineRadioCoreConfiguration;
 import io.github.dsheirer.audio.broadcast.openmhz.OpenMHzBroadcaster;
 import io.github.dsheirer.audio.broadcast.openmhz.OpenMHzConfiguration;
 import io.github.dsheirer.audio.broadcast.icecast.IcecastHTTPAudioBroadcaster;
@@ -74,8 +77,12 @@ public class BroadcastFactory
                     return new BroadcastifyCallBroadcaster((BroadcastifyCallSiteConfiguration)configuration,
                         inputAudioFormat, mp3Setting, aliasModel);
                 case RDIOSCANNER_CALL:
+                case THINLINE_RADIO:
                     return new RdioScannerBroadcaster((RdioScannerConfiguration)configuration,
                             inputAudioFormat, mp3Setting, aliasModel);
+                case THINLINE_RADIO_CORE:
+                    return new ThinlineRadioCoreBroadcaster((ThinlineRadioCoreConfiguration)configuration,
+                            aliasModel, userPreferences);
                 case OPENMHZ:
                     return new OpenMHzBroadcaster((OpenMHzConfiguration)configuration,
                         inputAudioFormat, mp3Setting, aliasModel);
@@ -123,6 +130,10 @@ public class BroadcastFactory
                 return new BroadcastifyCallSiteConfiguration(format);
             case RDIOSCANNER_CALL:
                 return new RdioScannerConfiguration(format);
+            case THINLINE_RADIO:
+                return new ThinlineRadioConfiguration(format);
+            case THINLINE_RADIO_CORE:
+                return new ThinlineRadioCoreConfiguration(format);
             case BROADCASTIFY:
                 return new BroadcastifyFeedConfiguration(format);
             case OPENMHZ:

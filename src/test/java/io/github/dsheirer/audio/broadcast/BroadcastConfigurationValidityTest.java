@@ -73,6 +73,14 @@ class BroadcastConfigurationValidityTest
         rdio.setSystemID(0);
         assertFalse(rdio.isValid());
 
+        var thinlineCore = new io.github.dsheirer.audio.broadcast.thinline.ThinlineRadioCoreConfiguration();
+        thinlineCore.setSystemID(9);
+        thinlineCore.setHost("http://localhost:3000/api/call-upload");
+        thinlineCore.setApiKey("");
+        assertTrue(thinlineCore.isValid(), "Core is valid with an empty per-stream API key");
+        thinlineCore.setHost("");
+        assertFalse(thinlineCore.isValid());
+
         var openMhz = new OpenMHzConfiguration();
         openMhz.setHost("");
         openMhz.setSystemName("");

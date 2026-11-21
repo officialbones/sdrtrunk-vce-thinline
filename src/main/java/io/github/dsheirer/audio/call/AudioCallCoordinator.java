@@ -171,6 +171,24 @@ public class AudioCallCoordinator implements Listener<AudioCallEvent>
             0L, 0L, 0L), 0, 0, 0L, List.of(), List.of());
     private volatile boolean mAccepting = true;
     private volatile boolean mDisposed;
+    private volatile Consumer<AudioCallSnapshot> mCoreCallStartListener;
+    private volatile Consumer<CallLegId> mCoreCallDropListener;
+
+    /**
+     * Optional ThinLine Core early-start notifier. Invoked when a live call with streaming destinations begins.
+     */
+    public void setCoreCallStartListener(Consumer<AudioCallSnapshot> listener)
+    {
+        mCoreCallStartListener = listener;
+    }
+
+    /**
+     * Optional ThinLine Core drop notifier for legs aborted before a completed recording is produced.
+     */
+    public void setCoreCallDropListener(Consumer<CallLegId> listener)
+    {
+        mCoreCallDropListener = listener;
+    }
 
     /**
      * Production constructor.  The resolved-call consumer is notified once before any output handoff and normally
@@ -341,6 +359,7 @@ public class AudioCallCoordinator implements Listener<AudioCallEvent>
         if(callLegId != null && callLegId.markIngressCompromised())
         {
             mAbortedCallCount.incrementAndGet();
+            notifyCoreCallDropped(callLegId);
 
             if(mIngress.offer(ABORT_LEG, true, callLegId, 0L))
             {
@@ -354,6 +373,40 @@ public class AudioCallCoordinator implements Listener<AudioCallEvent>
         }
 
         signalWorker();
+    }
+
+    private void notifyCoreCallStarted(AudioCallSnapshot snapshot)
+    {
+        Consumer<AudioCallSnapshot> listener = mCoreCallStartListener;
+        if(listener == null || snapshot == null || !snapshot.hasBroadcastChannels())
+        {
+            return;
+        }
+        try
+        {
+            listener.accept(snapshot);
+        }
+        catch(RuntimeException exception)
+        {
+            mLog.warn("ThinLine Core call-start notification failed", exception);
+        }
+    }
+
+    private void notifyCoreCallDropped(CallLegId callLegId)
+    {
+        Consumer<CallLegId> listener = mCoreCallDropListener;
+        if(listener == null || callLegId == null)
+        {
+            return;
+        }
+        try
+        {
+            listener.accept(callLegId);
+        }
+        catch(RuntimeException exception)
+        {
+            mLog.warn("ThinLine Core call-drop notification failed", exception);
+        }
     }
 
     private void signalWorker()
@@ -460,6 +513,7 @@ public class AudioCallCoordinator implements Listener<AudioCallEvent>
             leg = new ReceiverLeg(callLegId, snapshot);
             mActiveLegs.put(callLegId, leg);
             markDiagnosticSnapshotDirty();
+            notifyCoreCallStarted(snapshot);
         }
 
         long acceptedSamples = leg.accept(event, false,

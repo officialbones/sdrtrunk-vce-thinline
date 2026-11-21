@@ -682,7 +682,86 @@ export function createStreamingWorkspace(deps) {
   actions.append(findFeedsAction, addAction);
   toolbar.append(summary, actions);
   pageMeta.append(note, freshness);
-  host.append(toolbar, message, destinationHost, pageMeta);
+
+  const thinlineCard = node('section', 'streaming-thinline-site ui-surface');
+  thinlineCard.append(node('h2', 'streaming-destination-title', 'Thinline Radio site control'));
+  thinlineCard.append(node('p', 'muted',
+    'Core destinations use this site key and URL. Leave per-stream API keys empty for Thinline Radio Core.'));
+  const thinlineForm = node('form', 'admin-form ui-form-workflow-inset');
+  const thinlineEnabledToggle = uiToggleField('Report site health / enable Core websocket', false, 'Enable Thinline site control',
+    'Required for Thinline Radio Core destinations.');
+  const thinlineEnabled = thinlineEnabledToggle.querySelector('input');
+  const thinlineUrl = input('text');
+  thinlineUrl.placeholder = 'https://scanner.example.com';
+  const thinlineKey = input('password');
+  thinlineKey.placeholder = 'Site control API key';
+  const thinlineFeedback = node('div');
+  thinlineFeedback.setAttribute('role', 'status');
+  thinlineForm.append(
+    thinlineEnabledToggle,
+    formField('Thinline Radio URL', thinlineUrl),
+    formField('Site control API key', thinlineKey),
+    thinlineFeedback);
+  const thinlineActions = node('div', 'ui-action-row');
+  const saveThinline = button('Save site settings', null, true);
+  const testThinline = button('Test site key', null, false);
+  thinlineActions.append(testThinline, saveThinline);
+  thinlineCard.append(thinlineForm, thinlineActions);
+
+  async function loadThinlineSettings() {
+    try {
+      const documentValue = await requestJson('/api/v1/admin/thinline-preferences', { csrf: false, signal });
+      const settings = documentValue.settings || {};
+      setUiToggle(thinlineEnabled, !!settings.enabled);
+      thinlineUrl.value = settings.url || '';
+      thinlineKey.placeholder = settings.api_key_configured ? 'Site key saved — enter a new key to replace it' :
+        'Site control API key';
+      thinlineFeedback.replaceChildren();
+    } catch (error) {
+      if (error.name !== 'AbortError') showError(thinlineFeedback, error);
+    }
+  }
+
+  saveThinline.addEventListener('click', () => perform(async () => {
+    thinlineFeedback.replaceChildren(feedback('Saving…', 'loading'));
+    const body = {
+      settings: {
+        enabled: thinlineEnabled.checked,
+        url: thinlineUrl.value.trim(),
+        alert_tuner: true, alert_control: true, alert_uploader: true, alert_overflow: true, alert_offline: true
+      }
+    };
+    if (thinlineKey.value) body.settings.api_key = thinlineKey.value;
+    try {
+      await requestJson('/api/v1/admin/thinline-preferences', { method: 'PUT', body, signal });
+      thinlineKey.value = '';
+      await loadThinlineSettings();
+      thinlineFeedback.replaceChildren(feedback('Site settings saved.'));
+    } catch (error) {
+      if (error.name !== 'AbortError') showError(thinlineFeedback, error);
+    }
+  }));
+
+  testThinline.addEventListener('click', () => perform(async () => {
+    thinlineFeedback.replaceChildren(feedback('Testing…', 'loading'));
+    try {
+      if (thinlineKey.value || thinlineUrl.value.trim()) {
+        const body = { settings: { enabled: thinlineEnabled.checked, url: thinlineUrl.value.trim() } };
+        if (thinlineKey.value) body.settings.api_key = thinlineKey.value;
+        await requestJson('/api/v1/admin/thinline-preferences', { method: 'PUT', body, signal });
+        thinlineKey.value = '';
+      }
+      const result = await requestJson('/api/v1/admin/thinline-preferences/test', { method: 'POST', body: {}, signal });
+      if (result.ok) thinlineFeedback.replaceChildren(feedback('Site key accepted by ThinLine.'));
+      else thinlineFeedback.replaceChildren(feedback(result.error || 'ThinLine refused the connection.', 'error'));
+      await loadThinlineSettings();
+    } catch (error) {
+      if (error.name !== 'AbortError') showError(thinlineFeedback, error);
+    }
+  }));
+
+  host.append(toolbar, thinlineCard, message, destinationHost, pageMeta);
+  loadThinlineSettings();
   const dispose = () => {
     if (disposed) return;
     disposed = true; lifetime.abort(); clearTimeout(timer);
