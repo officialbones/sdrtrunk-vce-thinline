@@ -14,6 +14,7 @@ package io.github.dsheirer.database.importer;
 import io.github.dsheirer.alias.Alias;
 import io.github.dsheirer.alias.AliasFactory;
 import io.github.dsheirer.alias.AliasListDefinition;
+import io.github.dsheirer.alias.NewAliasBehavior;
 import io.github.dsheirer.alias.UnmatchedTalkgroupPolicy;
 import io.github.dsheirer.alias.id.broadcast.BroadcastChannel;
 import io.github.dsheirer.audio.broadcast.BroadcastConfiguration;
@@ -237,32 +238,53 @@ public final class LegacyXmlConfigurationMerger
     private static void updateBroadcastRoutes(Alias alias,
                                               Map<String,BroadcastConfiguration> importedStreams)
     {
+        // Drop named routes that do not match an imported stream (e.g. ThinLine "dashboard" UI targets).
+        List<BroadcastChannel> resolved = new ArrayList<>();
         for(BroadcastChannel route: alias.broadcastChannels())
         {
             BroadcastConfiguration stream = importedStreams.get(normalize(route.getChannelName()));
-
             if(stream != null)
             {
-                route.setConfigurationId(stream.getConfigurationId());
-                route.setChannelName(stream.getName());
+                resolved.add(new BroadcastChannel(stream.getConfigurationId(), stream.getName()));
             }
         }
+        alias.setBroadcastChannels(resolved);
     }
 
     private static void updateBroadcastRoutes(AliasListDefinition definition,
                                               Map<String,BroadcastConfiguration> importedStreams)
     {
         UnmatchedTalkgroupPolicy policy = definition.getUnmatchedTalkgroupPolicy();
-        Set<BroadcastChannel> destinations = new LinkedHashSet<>();
-
-        for(BroadcastChannel destination: policy.getStreamDestinations())
-        {
-            BroadcastConfiguration stream = importedStreams.get(normalize(destination.getChannelName()));
-            destinations.add(stream != null ?
-                new BroadcastChannel(stream.getConfigurationId(), stream.getName()) : destination);
-        }
-
+        Set<BroadcastChannel> destinations = resolveStreamDestinations(policy.getStreamDestinations(),
+            importedStreams);
         definition.setUnmatchedTalkgroupPolicy(new UnmatchedTalkgroupPolicy(policy.isRecordEnabled(), destinations));
+
+        NewAliasBehavior newAlias = definition.getNewAliasBehavior();
+        definition.setNewAliasBehavior(new NewAliasBehavior(newAlias.isRecordEnabled(),
+            resolveStreamDestinations(newAlias.getStreamDestinations(), importedStreams)));
+    }
+
+    private static Set<BroadcastChannel> resolveStreamDestinations(Iterable<BroadcastChannel> destinations,
+                                                                   Map<String,BroadcastConfiguration> importedStreams)
+    {
+        Set<BroadcastChannel> resolved = new LinkedHashSet<>();
+        if(destinations == null)
+        {
+            return resolved;
+        }
+        for(BroadcastChannel destination: destinations)
+        {
+            if(destination == null)
+            {
+                continue;
+            }
+            BroadcastConfiguration stream = importedStreams.get(normalize(destination.getChannelName()));
+            if(stream != null)
+            {
+                resolved.add(new BroadcastChannel(stream.getConfigurationId(), stream.getName()));
+            }
+        }
+        return resolved;
     }
 
     private static void regenerateUniqueConfigurationId(Channel channel, Set<String> used)
